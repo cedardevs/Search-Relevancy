@@ -1,6 +1,3 @@
-// Review: If you have getters and setters, just make the fields public and then you can remove all of the getters and setters.
-// This is not necessary in Groovy and in languages like Java, people use libraries like Lombok to remove getters and setters.
-
 // -----------------------------------------------------------------
 // class SearchLog
 // Description :
@@ -12,9 +9,16 @@ class SearchLog {
     private Boolean facets                      // The facet obtained from a log
     private Tuple2<Integer, Integer> page       // The max and offset of a log
 
-    // Review: Remove this comment, I know it is a constructor.
     // Constructor(s)
     // --------------
+
+    SearchLog() {
+        this.searchQuery = ""
+        this.filters = []
+        this.facets = false
+        this.page = new Tuple2<Integer, Integer>(0, 0)
+    }
+
     SearchLog(pQuery, pFilters, pFacets, pPage){
         this.searchQuery = pQuery
         this.filters = pFilters
@@ -22,7 +26,7 @@ class SearchLog {
         this.page = pPage
     }
 
-    // Getters
+    // Getters/Setters
     // -------
     String get_search_query(){
         return this.searchQuery
@@ -40,9 +44,6 @@ class SearchLog {
         return this.page
     }
 
-
-    // Setters
-    // -------
     void set_search_query(String pQuery){
         this.searchQuery = pQuery
     }
