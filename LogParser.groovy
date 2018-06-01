@@ -12,7 +12,7 @@ import SearchLog
 // Still to do/change
 //  1. Clear logPaths and logLines after they have been used to free up memory usage
 //  2. Implement calculate_common_facets() and calculate_common_pages()
-//  3. 
+//  3. Refactor get_filters() to utilize find_field_end()
 // ---------------------------------------------------------------------------------
 
 
@@ -20,7 +20,6 @@ import SearchLog
 
 
 // --------------------------------------------------------------------------------------------------
-// SearchEngineLog
 // Description :
 //      An object used to parse search query logs and produce usage statistics based on the log files
 // --------------------------------------------------------------------------------------------------
@@ -39,25 +38,15 @@ class LogParser {
     private String pageOutputFile           // The file path to output pageMap [NOT IN USE YET]
 
 
-    //Review: All three constructors initialize the above fields. Break it out into its own method, to reduce repeated code
-    // ex. private void initializeDataMembers(queryOutputFile="", filterOutputFile="", facetOutputFile="", pageOutputFile="")
+
     LogParser(){
-        this.logPaths         = []
-        this.logs             = []
-        this.logLines         = []
-        this.queryMap         = [:]
-        this.filterMap        = [:]
-        this.queryOutputFile  = ""
-        this.filterOutputFile = ""
-        this.facetOutputFile  = ""
-        this.pageOutputFile   = ""
+        initialize_data_members()
     }
 
 
 
 
     // ---------------------------------------------------------------------------------------------------------------------------
-    // SearchEngineLog(paths)
     // Description :
     //      Adds an initial filepath to the object and extracts the lines from the log
     // Arguments :
@@ -65,15 +54,7 @@ class LogParser {
     // ---------------------------------------------------------------------------------------------------------------------------
     LogParser(List<String> paths) {
         int len = paths.size()
-        this.logPaths         = []
-        this.logs             = []
-        this.logLines         = []
-        this.queryMap         = [:]
-        this.filterMap        = [:]
-        this.queryOutputFile  = ""
-        this.filterOutputFile = ""
-        this.facetOutputFile  = ""
-        this.pageOutputFile   = ""
+        initialize_data_members()
 
         for (int i = 0; i < len; i++){
             add_log_path(paths[i])
@@ -85,7 +66,6 @@ class LogParser {
 
 
     // ---------------------------------------------------------------------------------------------------------------------------
-    // SearchEngineLog(paths)
     // Description :
     //      Adds an initial filepath to the object and extracts the lines from the log, and outputs the results to specified files
     // Arguments :
@@ -97,15 +77,7 @@ class LogParser {
     // ---------------------------------------------------------------------------------------------------------------------------
     LogParser(List<String> paths, String queryFile, String filterFile, String facetFile, String pageFile) {
         int len = paths.size()
-        this.logPaths         = []
-        this.logs             = []
-        this.logLines         = []
-        this.queryMap         = [:]
-        this.filterMap        = [:]
-        this.queryOutputFile  = queryFile
-        this.filterOutputFile = filterFile
-        this.facetOutputFile  = facetFile
-        this.pageOutputFile   = pageFile
+        initialize_data_members()
 
         for (int i = 0; i < len; i++){
             add_log_path(paths[i])
@@ -114,7 +86,6 @@ class LogParser {
         extract_lines()
         calculate_common_queries()
         calculate_common_filters()
-        output_logs(this.queryOutputFile, this.filterOutputFile, this.facetOutputFile, this.pageOutputFile)
     }
 
 
@@ -130,7 +101,6 @@ class LogParser {
 
 
     // --------------------------------------------------------
-    // void add_log_path(String filePath)
     // Description :
     //      Adds a log file to the object based.
     // Params :
@@ -141,62 +111,39 @@ class LogParser {
     }
 
 
-    // Setters
-    // -------
-    void set_queryOutputFile(String path){
-        this.queryOutputFile = path
+    // Getters
+    // ---------------
+    Map<String, Integer> get_queryMap(){
+        return this.queryMap
     }
 
-    void set_filterOutputFile(String path){
-        this.filterOutputFile = path
-    }
-
-    void set_facetOutputFile(String path){
-        this.facetOutputFile = path
-    }
-
-    void set_pageOutputFile(String path){
-        this.pageOutputFile = path
+    Map<String, Integer> get_filterMap(){
+        return this.filterMap
     }
 
 
-    // Review: You can get rid of the int len and the for loop if you write
-    // logPaths.each { String logpath -> }
-    // Also, refactor the code in the else block. Usually, multiple if/else blocks + multiple loops is a code smell.
-    // Try refactoring just the last loop (file.eachLine) into a method called addIncomingLines()
 
     // ----------------------------------------------------------------
-    // void extract_lines()
     // Description :
     //      Helper function to load the lines from all the current logs
     // ----------------------------------------------------------------
     void extract_lines() {
-        int len = this.logPaths.size()
-
-        final int INCOMING_START = 8        // The index of 'incoming' of the log after the line has been split
 
         // Loop through all queued logs
         // ----------------------------
-        for (int i = 0; i < len; i++) {
-            File file = new File(this.logPaths[i])
+        logPaths.each { String path ->
+            File file = new File(path)
 
             if ( !(file.exists()) ) {
-                println(this.logPaths[i] + " did not open.")
+                println("${path} did not open.")
             }
 
             else {
                 // Read each line and add only lines pertaining to 'incoming search parameters'
-                // ----------------------------------------------------------------------------
+                // MAY NEED TO CHANGE add_incoming_line() AND parse_line() IF THE LOG FORMAT CHANGES
+                // ---------------------------------------------------------------------------------
                 file.eachLine('utf-8') {String line ->
-                    // Accessing this location instead of wasting time splitting the line
-                    // MAY NEED TO CHANGE THIS AND parse_line() IF THE LOG FORMAT CHANGES
-                    // ------------------------------------------------------------------
-                    String[] words = line.split()
-
-                    if (words[INCOMING_START] == "incoming") {
-                        this.logLines.add(line)
-                        parse_line(words)
-                    }
+                    add_incoming_line(line)
                 }
             }
         }
@@ -205,60 +152,35 @@ class LogParser {
 
 
     // -----------------------------------------------------------------------------------------------
-    // calculate_common_queries()
     // Description :
     //      Takes this.logs and maps all queries found to the number of times each query has been seen
     // -----------------------------------------------------------------------------------------------
     void calculate_common_queries() {
-        int i = 0;
         int len = this.logs.size()
 
-        this.queryMap.put( (this.logs[0].get_search_query()), 1)
-
-        // Review: Inside this loop, consider breaking out all that logic
-        // into its own private method. Properly named, it will help you reduce the use of comments to
-        // explain what is going on.
-        // this.logs[i].get_search_query() is difficult to parse and perhaps should have a named variable
-        for (i = 1; i < len; i++) {
-
-            // If the term has not been seen before, then add it to the map and set its value to zero
-            // --------------------------------------------------------------------------------------
-            if ( !(this.queryMap.containsKey(this.logs[i].get_search_query())) ){
-                this.queryMap.put( (this.logs[i].get_search_query()), 1)
-            }
-            else{
-                this.queryMap[this.logs[i].get_search_query()] += 1
-            }
+        for (int i = 0; i < len; i++) {
+            String currQuery = this.logs[i].get_search_query()
+            add_occurrence(this.queryMap, currQuery)
         }
-
-        // Sort the map by descending values
-        // ---------------------------------
         this.queryMap = this.queryMap.sort { -it.value }
     }
 
 
 
     // -------------------------------------------------------------------------------------
-    // calculate_common_filters()
     // Description :
     //      Takes all the filters and keeps a count of how many times a filter has been seen
     // -------------------------------------------------------------------------------------
     void calculate_common_filters() {
-        int i, j = 0;
+        int j = 0;
         int len = this.logs.size()
 
-        this.filterMap.put( (this.logs[0].get_filters()[0]), 1)
-
-        for (i = 0; i < len; i++){
+        for (int i = 0; i < len; i++){
             int filterLen = this.logs[i].get_filters().size()
 
             for (j = 0; j < filterLen; j++){
-                if ( !(this.filterMap.containsKey(this.logs[i].get_filters()[j])) ){
-                    this.filterMap.put( (this.logs[i].get_filters()[j]), 1)
-                }
-                else{
-                    this.filterMap[this.logs[i].get_filters()[j]] += 1
-                }
+                String currFilter = this.logs[i].get_filters()[j]
+                add_occurrence(this.filterMap, currFilter)
             }
         }
         this.filterMap = this.filterMap.sort { -it.value }
@@ -276,70 +198,49 @@ class LogParser {
 
 
 
-    // ---------------------------------------------------------------------------------------
-    // output_logs(String oFileName)
-    // Description :
-    //      Takes the queries from the queryMap and output the key : value to the desired file
-    // Params :
-    //      pQueryFile  : the file path for the query output
-    //      pFilterFile : the file path for the filter output
-    //      pFacetFile  : the file path for the facet output
-    //      pPageFile   : the file path for the page output
-    // ---------------------------------------------------------------------------------------
-    void output_logs(String pQueryFile, String pFilterFile, String pFacetFile, String pPageFile) {
-        int i = 0;
-        int len = logs.size()
-        List<String> output = []
-        File qFile = new File(pQueryFile)
-        File fFile = new File(pFilterFile)
-        File facetFile = new File(pFacetFile)
-        File pFile = new File(pPageFile)
-
-
-        if ( !(qFile.exists()) ){
-            qFile.createNewFile()
-        }
-        if ( !(fFile.exists()) ){
-            fFile.createNewFile()
-        }
-        /*
-        if ( !(facetFile.exists()) ){
-            facetFile.createNewFile()
-        }
-        if ( !(pFile.exists()) ){
-            pFile.createNewFile()
-        }
-        */
-
-
-        qFile.withWriter('utf-8') { out ->
-            out.println("Query,value")
-            this.queryMap.each { out.println("\"${make_csv_compatible(it.key)}\",${it.value}") }
-        }
-
-        fFile.withWriter('utf-8') { out ->
-            out.println("Filter,value")
-            this.filterMap.each { out.println("\"${make_csv_compatible(it.key)}\",${it.value}") }
-        }
-    }
-
-
-
 
     // ---------------------
     // PRIVATE CLASS METHODS
     // ---------------------
 
-    //Review: If you had to test parse_line(), would it be very easy to test if the method is 150 lines long and does multiple things?
 
 
-    // ----------------------------------------------------------------------------------------------------------
-    // void parse_line(String line)
+    // --------------------------------------------------
     // Description :
-    //      Parses the line in order to determine search queries, filters, [FILL OUT THE REST OF THE DESCRIPTION]
+    //      Initializes the data members for constructors
+    // --------------------------------------------------
+    private void initialize_data_members(){
+        this.logPaths         = []
+        this.logs             = []
+        this.logLines         = []
+        this.queryMap         = [:]
+        this.filterMap        = [:]
+    }
+
+
+
+    // ---------------------------------------------------------------------------------------------
+    // Description :
+    //      Adds a line to the logLines data member if the line pertains to "incoming search params"
+    // ---------------------------------------------------------------------------------------------
+    void add_incoming_line(String line){
+
+        final int INCOMING_START = 8        // The index of 'incoming' of the log after the line has been split
+
+        String[] words = line.split()
+
+        if (words[INCOMING_START] == "incoming") {
+            this.logLines.add(line)
+            parse_line(words)
+        }
+    }
+
+    // ------------------------------------------------------------------------------------------------
+    // Description :
+    //      Parses the line in order to determine search queries, filters, facet value, and page/offset
     // Params :
     //      line : the log line in which to parse for its data members
-    // ----------------------------------------------------------------------------------------------------------
+    // ------------------------------------------------------------------------------------------------
     private void parse_line(String[] line) {
         int i                 = 8       // variable for tracking location in the log string starting at queries:[
         int j                 = i+1     // variable for traversing the log string
@@ -347,16 +248,20 @@ class LogParser {
         int len               = 0       // length of workingLine
         String tQuery                   // temporary string for the query
         List<String> tFilters = []      // temporary variable to hold filters
-        Boolean tFacet        = true    // temporary variable for the facet
+        Boolean tFacet        = false   // temporary variable for the facet
         def tPage                       // temporary variable for the page/offset
 
-        final int SEARCH_START  = 11    // The start of the 'incoming search params' section of the log
-        final int QUERIES_START = 32    // The start of the queries section of the log
-        final int FILTERS_START = 10    // The start of the filters section of the log
-        final int FACETS_START  = 9     // The start of the facets section of the log
-        final int FACETS_TRUE   = 16    // Length needed to reach the end of the facets section if facets = true
-        final int FACETS_FALSE  = 17    // Length needed to reach the end of the facets section if facets = false
-        final int PAGE_START    = 9     // The start the of page section of the log
+
+        // After each field has been found, these are the index increments to reach the following field
+        // These are a fixed distance from each field
+        // --------------------------------------------------------------------------------------------
+        final int SEARCH_START  = 11    // The index of the start of the 'incoming search params' section of the log
+        final int QUERIES_START = 32    // The index increment needed to get to the start of the queries section of the log
+        final int FILTERS_START = 10    // The index increment needed to get to the start of the filters section of the log
+        final int FACETS_START  = 9     // The index increment needed to get to the start of the facets section of the log
+        final int FACETS_TRUE   = 16    // The index increment needed to reach the start of the page:<max> section if facets = true
+        final int FACETS_FALSE  = 17    // The index increment needed to reach the start of the page:<max> section if facets = false
+        final int OFFSET_START  = 9     // The start the of page:<offset> section of the log
 
 
         // Drop everything before 'incoming search params' as well as the outer brackets, and change to a string
@@ -368,24 +273,7 @@ class LogParser {
 
         // get text queries
         // ----------------
-        while (currLevel){
-            if (workingLine[j] == '['){
-                currLevel++
-            }
-            if (workingLine[j] == ']'){
-                currLevel--
-
-                // Exception for a random bracket in the query text
-                // ------------------------------------------------
-                if ( (j+1) < len ){
-                    if ( (workingLine[j+1] != ']' && workingLine[j+1] != ',') ){
-                        currLevel++
-                    }
-                }
-            }
-            j++
-        }
-
+        j = find_field_end(workingLine, len, i)
 
 
         // Check to see if the text query is empty
@@ -395,56 +283,33 @@ class LogParser {
             tQuery = "N/A"
         }
         else{
-            // There's only one type, which makes the value a fixed starting position in the log
-            // ---------------------------------------------------------------------------------
             tQuery = workingLine[QUERIES_START..(j-3)]
         }
 
 
 
         // Get filters
-        // Go to the start of the filters section in the log, which is a fixed location after the search query
-        // --------------------------------------------------------------------------------------------------
+        // -----------
         i = j + FILTERS_START
-        j = i + 1
-        if (j < len){
-            currLevel = 1
 
-            // Get everything within the filter brackets
-            // currLevel tracks whether there are additional brackets within filters
-            // ---------------------------------------------------------------------
-            while (currLevel){
-                if (workingLine[j] == '[') {
-                    currLevel++
-                }
-                if (workingLine[j] == ']'){
-                    currLevel--
-                }
-                j++
-            }
+        if ( (i+1) < len){
+            j = find_field_end(workingLine, len, i)
 
             if ( (j - i) == 2 ){
                 tFilters.add("N/A")
             }
             else{
-                // There's only one type, which makes the value a fixed position in the log
-                // ------------------------------------------------------------------------
-                tFilters.add(workingLine[i..(j-1)])
+                tFilters = get_filters(workingLine[(i+1)..j-2])
             }
         }
         else{
             tFilters.add("N/A")
         }
 
-        if (tFilters[0] != "N/A"){
-            tFilters = get_filters(workingLine[(i+1)..j-2])
-        }
-
 
 
         // Get Facet
-        // Go to the start of the facets section in the log, which is a fixed location after the filters
-        // ---------------------------------------------------------------------------------------------
+        // ---------
         i = j + FACETS_START
         j = i + 1
         if (j < len){
@@ -453,19 +318,14 @@ class LogParser {
                 i += FACETS_TRUE
             }
             else{
-                tFacet = false
                 i += FACETS_FALSE
             }
-        }
-        else{
-            tFacet = false
         }
 
 
 
         // get page and offset
-        // the start of the page/offset section is in a fixed location after the facets section
-        // ------------------------------------------------------------------------------------
+        // -------------------
         j = i + 1
         if (j < len){
             int x, y
@@ -477,7 +337,7 @@ class LogParser {
             }
 
             x = workingLine[i..(j-1)].toInteger()
-            i = j + PAGE_START
+            i = j + OFFSET_START
             j = i + 1
 
             // offset:<int>
@@ -495,14 +355,48 @@ class LogParser {
 
         SearchLog tmp = new SearchLog(tQuery, tFilters, tFacet, tPage)
         this.logs.add(tmp)
+    }
 
 
+
+    // --------------------------------------------------------------------------------------------------------------------------------
+    // Description :
+    //      A helper function for parse_line() that finds the outer most level of square brackets starting at a given index
+    // Params :
+    //      line is the string to parse
+    //      len is the length of line
+    //      startIndex is the starting index in which to traverse in the 'line' parameter (THE INDEX MUST BE A '[' CHARACTER IN 'line')
+    // Return:
+    //      returns the index of the character AFTER  the outer most closing (']') bracket
+    // --------------------------------------------------------------------------------------------------------------------------------
+    private int find_field_end(String line, int len, int startIndex){
+        int j = startIndex + 1
+        int currLevel = 1
+
+        while (currLevel){
+            if (line[j] == '['){
+                currLevel++
+            }
+            if (line[j] == ']'){
+                currLevel--
+
+                // Exception for a random bracket in the query text
+                // ------------------------------------------------
+                if ( (j+1) < len ){
+                    if ( (line[j+1] != ']' && line[j+1] != ',') ){
+                        currLevel++
+                    }
+                }
+            }
+            j++
+        }
+
+        return j
     }
 
 
 
     // --------------------------------------------------------------------------------------------------------------
-    // get_filters(String filterLine)
     // Description :
     //      Breaks down the filter string by its individual components and returns a list of all components extracted
     // Params :
@@ -538,14 +432,21 @@ class LogParser {
 
 
 
-    // ----------------------------------------------------------------------------------------------------
-    // make_csv_compatible(String key)
+    // --------------------------------------------------------------------
     // Description :
-    //      A helper function to make a query .csv compatible by replacing single quotes with double quotes
+    //      Keeps a count of all the occurrences of 'line' in the given map
+    //      Adds a new entry in the map if line has not been seen before
     // Params :
-    //      key : the string in which to make csv compatible
-    // ----------------------------------------------------------------------------------------------------
-    private String make_csv_compatible(String key) {
-        return (key.replaceAll('"', '""'))
+    //      pMap is the map for which to check if 'line' exists
+    //      line is a string to add or increment the count in pMap
+    // --------------------------------------------------------------------
+
+    private void add_occurrence(Map<String, Integer> pMap, String line){
+        if ( !(pMap.containsKey(line)) ){
+            pMap.put( (line), 1)
+        }
+        else{
+            pMap[line] += 1
+        }
     }
 }
