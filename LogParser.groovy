@@ -39,7 +39,8 @@ class LogParser {
     private String pageOutputFile           // The file path to output pageMap [NOT IN USE YET]
 
 
-
+    //Review: All three constructors initialize the above fields. Break it out into its own method, to reduce repeated code
+    // ex. private void initializeDataMembers(queryOutputFile="", filterOutputFile="", facetOutputFile="", pageOutputFile="")
     LogParser(){
         this.logPaths         = []
         this.logs             = []
@@ -159,6 +160,10 @@ class LogParser {
     }
 
 
+    // Review: You can get rid of the int len and the for loop if you write
+    // logPaths.each { String logpath -> }
+    // Also, refactor the code in the else block. Usually, multiple if/else blocks + multiple loops is a code smell.
+    // Try refactoring just the last loop (file.eachLine) into a method called addIncomingLines()
 
     // ----------------------------------------------------------------
     // void extract_lines()
@@ -210,6 +215,10 @@ class LogParser {
 
         this.queryMap.put( (this.logs[0].get_search_query()), 1)
 
+        // Review: Inside this loop, consider breaking out all that logic
+        // into its own private method. Properly named, it will help you reduce the use of comments to
+        // explain what is going on.
+        // this.logs[i].get_search_query() is difficult to parse and perhaps should have a named variable
         for (i = 1; i < len; i++) {
 
             // If the term has not been seen before, then add it to the map and set its value to zero
@@ -321,7 +330,7 @@ class LogParser {
     // PRIVATE CLASS METHODS
     // ---------------------
 
-
+    //Review: If you had to test parse_line(), would it be very easy to test if the method is 150 lines long and does multiple things?
 
 
     // ----------------------------------------------------------------------------------------------------------
