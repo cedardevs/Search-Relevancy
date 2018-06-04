@@ -32,25 +32,25 @@ class LogParser {
     private List<String> logLines           // The raw (uncut) lines of the relevant logs
     private Map<String, Integer> queryMap   // Map of all queries and their occurrences
     private Map<String, Integer> filterMap  // Map of all filters and their occurrences
-    private String queryOutputFile          // The file path to output queryMap
-    private String filterOutputFile         // The file path to output filterMap
-    private String facetOutputFile          // The file path to output facetMap [NOT IN USE YET]
-    private String pageOutputFile           // The file path to output pageMap [NOT IN USE YET]
 
 
 
+
+    // ---------------------------------------------------------
+    // Description :
+    //      Default constructor that initalizes all data members
+    // ---------------------------------------------------------
     LogParser(){
         initialize_data_members()
     }
 
 
 
-
     // ---------------------------------------------------------------------------------------------------------------------------
     // Description :
     //      Adds an initial filepath to the object and extracts the lines from the log
-    // Arguments :
-    //      paths: a file path or paths to the logs that are to be parsed.
+    // Params :
+    //      paths : a file path or paths to the logs that are to be parsed.
     // ---------------------------------------------------------------------------------------------------------------------------
     LogParser(List<String> paths) {
         int len = paths.size()
@@ -59,30 +59,6 @@ class LogParser {
         for (int i = 0; i < len; i++){
             add_log_path(paths[i])
         }
-        extract_lines()
-        calculate_common_queries()
-        calculate_common_filters()
-    }
-
-
-    // ---------------------------------------------------------------------------------------------------------------------------
-    // Description :
-    //      Adds an initial filepath to the object and extracts the lines from the log, and outputs the results to specified files
-    // Arguments :
-    //      paths: a file path or paths to the logs that are to be parsed.
-    //      queryFile: the file path in which to output the results of calculate_common_queries()
-    //      filterFile: the file path in which to output the results of calculate_common_filters()
-    //      facetFile: the file path in which to output the results of calculate_common_facets()
-    //      pageFile: the file path in which to output the results of calculate_common_pages()
-    // ---------------------------------------------------------------------------------------------------------------------------
-    LogParser(List<String> paths, String queryFile, String filterFile, String facetFile, String pageFile) {
-        int len = paths.size()
-        initialize_data_members()
-
-        for (int i = 0; i < len; i++){
-            add_log_path(paths[i])
-        }
-
         extract_lines()
         calculate_common_queries()
         calculate_common_filters()
@@ -104,7 +80,7 @@ class LogParser {
     // Description :
     //      Adds a log file to the object based.
     // Params :
-    //      filePath: the path to the log in which to be added.
+    //      filePath : the path to the log in which to be added.
     // --------------------------------------------------------
     void add_log_path(String filePath) {
         this.logPaths.add(filePath)
@@ -235,6 +211,8 @@ class LogParser {
         }
     }
 
+
+
     // ------------------------------------------------------------------------------------------------
     // Description :
     //      Parses the line in order to determine search queries, filters, facet value, and page/offset
@@ -247,7 +225,7 @@ class LogParser {
         int currLevel         = 1       // variable to keep track of what level of brackets the function is in currently
         int len               = 0       // length of workingLine
         String tQuery                   // temporary string for the query
-        List<String> tFilters = []      // temporary variable to hold filters
+        List<String> tFilters = ["N/A"] // temporary variable to hold filters
         Boolean tFacet        = false   // temporary variable for the facet
         def tPage                       // temporary variable for the page/offset
 
@@ -256,12 +234,9 @@ class LogParser {
         // These are a fixed distance from each field
         // --------------------------------------------------------------------------------------------
         final int SEARCH_START  = 11    // The index of the start of the 'incoming search params' section of the log
-        final int QUERIES_START = 32    // The index increment needed to get to the start of the queries section of the log
         final int FILTERS_START = 10    // The index increment needed to get to the start of the filters section of the log
         final int FACETS_START  = 9     // The index increment needed to get to the start of the facets section of the log
-        final int FACETS_TRUE   = 16    // The index increment needed to reach the start of the page:<max> section if facets = true
-        final int FACETS_FALSE  = 17    // The index increment needed to reach the start of the page:<max> section if facets = false
-        final int OFFSET_START  = 9     // The start the of page:<offset> section of the log
+        final int FACETS_ESCAPE = 16    // The index increment needed to reach the start of the page:<max> section
 
 
         // Drop everything before 'incoming search params' as well as the outer brackets, and change to a string
@@ -271,21 +246,10 @@ class LogParser {
         workingLine = workingLine[1..-2]
         len = workingLine.size()
 
-        // get text queries
+        // Get text queries
         // ----------------
         j = find_field_end(workingLine, len, i)
-
-
-        // Check to see if the text query is empty
-        // ALLEGEDLY NOT NECESSARY IN ONESTOP 2.0
-        // ---------------------------------------
-        if ( (j - i) == 2 ){
-            tQuery = "N/A"
-        }
-        else{
-            tQuery = workingLine[QUERIES_START..(j-3)]
-        }
-
+        tQuery = get_query_from_line(workingLine, i, j)
 
 
         // Get filters
@@ -294,18 +258,8 @@ class LogParser {
 
         if ( (i+1) < len){
             j = find_field_end(workingLine, len, i)
-
-            if ( (j - i) == 2 ){
-                tFilters.add("N/A")
-            }
-            else{
-                tFilters = get_filters(workingLine[(i+1)..j-2])
-            }
+            tFilters = get_filters_from_line(workingLine, i, j)
         }
-        else{
-            tFilters.add("N/A")
-        }
-
 
 
         // Get Facet
@@ -313,13 +267,8 @@ class LogParser {
         i = j + FACETS_START
         j = i + 1
         if (j < len){
-            if (workingLine[i] == 't') {
-                tFacet = true
-                i += FACETS_TRUE
-            }
-            else{
-                i += FACETS_FALSE
-            }
+            tFacet = get_facet_from_line(workingLine, i)
+            i += ( FACETS_ESCAPE + bool_to_int(!tFacet) )       // The increment is different for facet = true and facet = false
         }
 
 
@@ -328,26 +277,8 @@ class LogParser {
         // -------------------
         j = i + 1
         if (j < len){
-            int x, y
+            tPage = get_page_from_line(workingLine, i, j)
 
-            // max:<int>
-            // ---------
-            while( workingLine[j] != ',' ){
-                j++
-            }
-
-            x = workingLine[i..(j-1)].toInteger()
-            i = j + OFFSET_START
-            j = i + 1
-
-            // offset:<int>
-            // ------------
-            while ( workingLine[j] != ']' ){
-                j++
-            }
-            y = workingLine[i..(j-1)].toInteger()
-
-            tPage = new Tuple2<Integer, Integer>(x, y)
         }
         else {
             tPage = new Tuple2<Integer, Integer>(0, 0)
@@ -363,9 +294,9 @@ class LogParser {
     // Description :
     //      A helper function for parse_line() that finds the outer most level of square brackets starting at a given index
     // Params :
-    //      line is the string to parse
-    //      len is the length of line
-    //      startIndex is the starting index in which to traverse in the 'line' parameter (THE INDEX MUST BE A '[' CHARACTER IN 'line')
+    //      line : the string to parse
+    //      len : the length of line
+    //      startIndex : the starting index in which to traverse in the 'line' parameter (THE INDEX MUST BE A '[' CHARACTER IN 'line')
     // Return:
     //      returns the index of the character AFTER  the outer most closing (']') bracket
     // --------------------------------------------------------------------------------------------------------------------------------
@@ -396,13 +327,55 @@ class LogParser {
 
 
 
-    // --------------------------------------------------------------------------------------------------------------
+    // --------------------------------------------------------------------------------
     // Description :
-    //      Breaks down the filter string by its individual components and returns a list of all components extracted
+    //      Helper function for parse_line() that gets the search query from a log line
+    // Params :
+    //      workingLine : the log line for which to extract the query from
+    //      startIndex : the starting index of the query field in workingLine
+    //      endIndex : the end index of the query field in workingLine
+    // --------------------------------------------------------------------------------
+    private String get_query_from_line(String workingLine, int startIndex, int endIndex){
+        final int QUERIES_START = startIndex + 24       // If there is a query, then it's in a fixed position from the starting index
+
+        // Allegedly cannot get "N/A" as a query in OneStop 2.0
+        // ----------------------------------------------------
+        if ( (endIndex - startIndex) == 2 ){
+            return "N/A"
+        }
+        else{
+            return workingLine[QUERIES_START..(endIndex-3)]
+        }
+    }
+
+
+
+    //
+    // Description :
+    //      Helper function for parse_line() that gets the filter from a log line
+    // Params :
+    //      workingLine : the log line for which to extract the filters from
+    //      startIndex : the starting index of the filters field in workingLine
+    //      endIndex : the end index of the filters field in workingLine
+    // --------------------------------------------------------------------------------
+    private List<String> get_filters_from_line(String workingLine, int startIndex, int endIndex){
+        if ( (endIndex - startIndex) == 2 ){
+            return ["N/A"]
+        }
+        else{
+            return get_filter_fields(workingLine[(startIndex+1)..(endIndex-2)])
+        }
+    }
+
+
+
+    // ------------------------------------------------------------------------------------------------------
+    // Description :
+    //      Breaks down the filter string by its individual fields and returns a list of all fields extracted
     // Params :
     //      filterLine : the filter produced from parse_line()
-    // --------------------------------------------------------------------------------------------------------------
-    private List<String> get_filters(String filterLine) {
+    // ------------------------------------------------------------------------------------------------------
+    private List<String> get_filter_fields(String filterLine) {
         int i, j = 1
         int currLevel = 0
         int len = filterLine.size()
@@ -428,6 +401,73 @@ class LogParser {
             j = i + 1
         }
         return fields
+    }
+
+
+
+    // ----------------------------------------------------------------------
+    // Description :
+    //      Helper function for parse_line() to get the facet from a log line
+    // Params :
+    //      workingLine : the line from which to get the facet
+    //      startIndex : the starting index of the facet field in workingLine
+    // ----------------------------------------------------------------------
+    private Boolean get_facet_from_line(String workingLine, int startIndex){
+        if (workingLine[startIndex] == 't') {
+            return true
+        }
+        else {
+            return false
+        }
+    }
+
+
+
+    // -----------------------------------------------
+    // Description :
+    //      converts a boolean to its integer value
+    // Param :
+    //      b : the boolean value to convert to 0 or 1
+    // -----------------------------------------------
+    private int bool_to_int(Boolean b){
+        return b.compareTo(false)
+    }
+
+
+
+    // -----------------------------------------------------------------------------------------
+    // Description :
+    //      Helper function for parse_line() to get the max and offset of a page from a log line
+    // Params :
+    //      workingLine : the line from which to get the page max/offset
+    //      startIndex : the starting index of the page field in workingLine
+    //      endIndex : the end index of the page field in workingLine
+    // -----------------------------------------------------------------------------------------
+    private Tuple2<Integer, Integer> get_page_from_line(String workingLine, int startIndex, int endIndex){
+        final int OFFSET_START  = 9     // The start the of page:<offset> section of the log from page:<max> section
+        int max, offset
+
+
+        // max:<int>
+        // ---------
+        while( workingLine[endIndex] != ',' ){
+            endIndex++
+        }
+
+        max = workingLine[startIndex..(endIndex-1)].toInteger()
+        startIndex = endIndex + OFFSET_START
+        endIndex = startIndex + 1
+
+        // offset:<int>
+        // ------------
+        while ( workingLine[endIndex] != ']' ){
+            endIndex++
+        }
+
+        offset = workingLine[startIndex..(endIndex-1)].toInteger()
+
+        Tuple2<Integer, Integer> retTuple = new Tuple2<Integer, Integer>(max, offset)
+        return retTuple
     }
 
 
