@@ -28,10 +28,11 @@ class LogParser {
     // Data members
     // ------------
     private List<String> logPaths           // File paths to search logs
-    private List<SearchLog> logs            // Individual data from the raw logs
+    private List<SearchLog> searchLogs      // Parsed data from search queries
     private List<String> logLines           // The raw (uncut) lines of the relevant logs
     private Map<String, Integer> queryMap   // Map of all queries and their occurrences
     private Map<String, Integer> filterMap  // Map of all filters and their occurrences
+    private Map<Boolean, Integer> facetMap  // Map of facet occurrences
 
 
 
@@ -132,11 +133,8 @@ class LogParser {
     //      Takes this.logs and maps all queries found to the number of times each query has been seen
     // -----------------------------------------------------------------------------------------------
     void calculate_common_queries() {
-        int len = this.logs.size()
-
-        for (int i = 0; i < len; i++) {
-            String currQuery = this.logs[i].get_search_query()
-            add_occurrence(this.queryMap, currQuery)
+        this.searchLogs.each { log ->
+            add_occurrence(this.queryMap, log.get_search_query())
         }
         this.queryMap = this.queryMap.sort { -it.value }
     }
@@ -148,15 +146,9 @@ class LogParser {
     //      Takes all the filters and keeps a count of how many times a filter has been seen
     // -------------------------------------------------------------------------------------
     void calculate_common_filters() {
-        int j = 0;
-        int len = this.logs.size()
-
-        for (int i = 0; i < len; i++){
-            int filterLen = this.logs[i].get_filters().size()
-
-            for (j = 0; j < filterLen; j++){
-                String currFilter = this.logs[i].get_filters()[j]
-                add_occurrence(this.filterMap, currFilter)
+        this.searchLogs.each { log ->
+            log.get_filters().each { filter ->
+                add_occurrence(this.filterMap, filter)
             }
         }
         this.filterMap = this.filterMap.sort { -it.value }
@@ -165,6 +157,9 @@ class LogParser {
 
 
     void calculate_common_facets(){
+        this.searchLogs.each { log ->
+            add_
+        }
 
     }
 
@@ -187,7 +182,8 @@ class LogParser {
     // --------------------------------------------------
     private void initialize_data_members(){
         this.logPaths         = []
-        this.logs             = []
+        this.searchLogs       = []
+        this.requestLogs      = []
         this.logLines         = []
         this.queryMap         = [:]
         this.filterMap        = [:]
@@ -205,7 +201,7 @@ class LogParser {
 
         String[] words = line.split()
 
-        if (words[INCOMING_START] == "incoming") {
+        if (words.size () > INCOMING_START && words[INCOMING_START] == "incoming") {
             this.logLines.add(line)
             parse_line(words)
         }
@@ -242,15 +238,16 @@ class LogParser {
         // Drop everything before 'incoming search params' as well as the outer brackets, and change to a string
         // MAY NEED TO CHANGE THIS AND extract_lines() IF THE LOG FORMAT CHANGES
         // -----------------------------------------------------------------------------------------------------
+        println(line)
         String workingLine = line.drop(SEARCH_START).join(" ")
         workingLine = workingLine[1..-2]
         len = workingLine.size()
 
         // Get text queries
         // ----------------
+
         j = find_field_end(workingLine, len, i)
         tQuery = get_query_from_line(workingLine, i, j)
-
 
         // Get filters
         // -----------
@@ -284,8 +281,16 @@ class LogParser {
             tPage = new Tuple2<Integer, Integer>(0, 0)
         }
 
+        // An exception needs to be checked if filters and facets doesn't appear at all in the log
+        // ---------------------------------------------------------------------------------------
+
+        if (tFilters[0][0] == ':'){
+            int k = len - tFilters[0].size()
+            tPage = get_page_from_line(workingLine, k, k+1)
+            tFilters = ["N/A"]
+        }
         SearchLog tmp = new SearchLog(tQuery, tFilters, tFacet, tPage)
-        this.logs.add(tmp)
+        this.searchLogs.add(tmp)
     }
 
 
@@ -304,7 +309,7 @@ class LogParser {
         int j = startIndex + 1
         int currLevel = 1
 
-        while (currLevel){
+        while (currLevel && j < len){
             if (line[j] == '['){
                 currLevel++
             }
