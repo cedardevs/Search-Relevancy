@@ -4,6 +4,7 @@
 //      Used to hold the information obtained from an individual log
 // -----------------------------------------------------------------
 class SearchLog {
+    private Date dateTime
     private String type                         // Is this a granule or collection search?
     private String searchQuery                  // The search query obtained from a log
     private List<String> filters                // A list of filters applied in a log
@@ -13,15 +14,9 @@ class SearchLog {
     // Constructor(s)
     // --------------
 
-    SearchLog() {
-        this.type = ""
-        this.searchQuery = ""
-        this.filters = []
-        this.facets = false
-        this.page = new Tuple2<Integer, Integer>(0, 0)
-    }
-
-    SearchLog(pQuery, pFilters, pFacets, pPage){
+    SearchLog(Date pDateTime = new Date(), String pType = "", String pQuery = "", List<String> pFilters = [], Boolean pFacets = false, Tuple2<Integer, Integer> pPage = new Tuple2<Integer, Integer>(0,0)) {
+        this.dateTime = pDateTime
+        this.type = pType
         this.searchQuery = pQuery
         this.filters = pFilters
         this.facets = pFacets
@@ -30,6 +25,14 @@ class SearchLog {
 
     // Getters/Setters
     // -------
+    Date get_date(){
+        return this.dateTime
+    }
+
+    String get_type(){
+        return this.type
+    }
+
     String get_search_query(){
         return this.searchQuery
     }
@@ -42,8 +45,12 @@ class SearchLog {
         return this.facets
     }
 
-    def get_page(){
+    Tuple2<Integer, Integer> get_page(){
         return this.page
+    }
+
+    void set_date(String pDateTime){
+        this.dateTime = new Date().parse("yyyy-M-d H:m:s.ms", pDateTime)
     }
 
     void set_search_query(String pQuery){

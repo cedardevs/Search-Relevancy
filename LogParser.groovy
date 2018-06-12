@@ -1,9 +1,12 @@
 import com.sun.org.apache.xpath.internal.operations.Bool
 import com.sun.xml.internal.bind.v2.runtime.reflect.opt.Const
+import groovy.json.JsonOutput
 
 import java.io.File
 import java.io.FileWriter
+import groovy.json.JsonSlurper
 import SearchLog
+import RequestLog
 
 
 
@@ -19,20 +22,18 @@ import SearchLog
 
 
 
-// --------------------------------------------------------------------------------------------------
+// --------------------------------------------------------------------------------------
 // Description :
-//      An object used to parse search query logs and produce usage statistics based on the log files
-// --------------------------------------------------------------------------------------------------
+//      An object used to parse log files and create log objects used for usage analytics
+// --------------------------------------------------------------------------------------
 class LogParser {
 
     // Data members
     // ------------
     private List<String> logPaths           // File paths to search logs
-    private List<SearchLog> searchLogs      // Parsed data from search queries
-    private List<String> logLines           // The raw (uncut) lines of the relevant logs
-    private Map<String, Integer> queryMap   // Map of all queries and their occurrences
-    private Map<String, Integer> filterMap  // Map of all filters and their occurrences
-    private Map<Boolean, Integer> facetMap  // Map of facet occurrences
+    private List<SearchLog> oldSearchLogs   // Parsed data from old formatted logs
+    private List<SearchLog> searchLogs      // Parsed data from new formatted search logs
+    private List<RequestLog> requestLogs    // Parsed data from new formatted request logs
 
 
 
@@ -54,20 +55,32 @@ class LogParser {
     //      paths : a file path or paths to the logs that are to be parsed.
     // ---------------------------------------------------------------------------------------------------------------------------
     LogParser(List<String> paths) {
-        int len = paths.size()
         initialize_data_members()
 
-        for (int i = 0; i < len; i++){
-            add_log_path(paths[i])
+        paths.each {String filePath ->
+            add_log_path(filePath)
         }
-        extract_lines()
-        calculate_common_queries()
-        calculate_common_filters()
+
+        read_logs()
     }
 
 
 
-
+    List<SearchLog> pass_old_search_logs(){
+        List<SearchLog> tmp = this.oldSearchLogs
+        this.oldSearchLogs = []
+        return tmp
+    }
+    List<SearchLog> pass_search_logs(){
+        List<SearchLog> tmp = this.searchLogs
+        this.searchLogs = []
+        return tmp
+    }
+    List<RequestLog> pass_request_logs(){
+        List<RequestLog> tmp = this.requestLogs
+        this.requestLogs = []
+        return tmp
+    }
 
     // --------------------
     // PUBLIC CLASS METHODS
@@ -84,18 +97,13 @@ class LogParser {
     //      filePath : the path to the log in which to be added.
     // --------------------------------------------------------
     void add_log_path(String filePath) {
-        this.logPaths.add(filePath)
-    }
-
-
-    // Getters
-    // ---------------
-    Map<String, Integer> get_queryMap(){
-        return this.queryMap
-    }
-
-    Map<String, Integer> get_filterMap(){
-        return this.filterMap
+        File iFile = new File(filePath)
+        if ( !(iFile.exists()) ){
+            println("${path} did not open.")
+        }
+        else{
+            this.logPaths.add(filePath)
+        }
     }
 
 
@@ -104,23 +112,15 @@ class LogParser {
     // Description :
     //      Helper function to load the lines from all the current logs
     // ----------------------------------------------------------------
-    void extract_lines() {
-
-        // Loop through all queued logs
-        // ----------------------------
+    void read_logs() {
         logPaths.each { String path ->
             File file = new File(path)
 
-            if ( !(file.exists()) ) {
-                println("${path} did not open.")
-            }
+            file.eachLine('utf-8') {String line ->
+                def logLine = is_search_log(line)
 
-            else {
-                // Read each line and add only lines pertaining to 'incoming search parameters'
-                // MAY NEED TO CHANGE add_incoming_line() AND parse_line() IF THE LOG FORMAT CHANGES
-                // ---------------------------------------------------------------------------------
-                file.eachLine('utf-8') {String line ->
-                    add_incoming_line(line)
+                if (logLine){
+                    parse_log(logLine)
                 }
             }
         }
@@ -128,6 +128,9 @@ class LogParser {
 
 
 
+
+
+/*
     // -----------------------------------------------------------------------------------------------
     // Description :
     //      Takes this.logs and maps all queries found to the number of times each query has been seen
@@ -157,15 +160,12 @@ class LogParser {
 
 
     void calculate_common_facets(){
-        this.searchLogs.each { log ->
-            add_
-        }
 
     }
 
     void calculate_common_pages(){
 
-    }
+    }*/
 
 
 
@@ -183,28 +183,104 @@ class LogParser {
     private void initialize_data_members(){
         this.logPaths         = []
         this.searchLogs       = []
+        this.oldSearchLogs    = []
         this.requestLogs      = []
-        this.logLines         = []
-        this.queryMap         = [:]
-        this.filterMap        = [:]
     }
 
 
 
-    // ---------------------------------------------------------------------------------------------
+    // -----------------------------------------------------------------------
     // Description :
-    //      Adds a line to the logLines data member if the line pertains to "incoming search params"
-    // ---------------------------------------------------------------------------------------------
-    void add_incoming_line(String line){
-
+    //      Determines if the log line pertains to search relevancy
+    // Params :
+    //      line : the line to determine if is valid
+    // Returns :
+    //      returns the split line if the line is relevant and false otherwise
+    // -----------------------------------------------------------------------
+    private def is_search_log(String line){
         final int INCOMING_START = 8        // The index of 'incoming' of the log after the line has been split
 
         String[] words = line.split()
 
-        if (words.size () > INCOMING_START && words[INCOMING_START] == "incoming") {
-            this.logLines.add(line)
-            parse_line(words)
+        if (words.size() > INCOMING_START && words[INCOMING_START] == "incoming") {
+            return words
         }
+        else{
+            return false
+        }
+    }
+
+
+
+    // ------------------------------------------------------------------------------------------
+    // Description :
+    //      Determines if the line is of an old log format and performs the proper parse function
+    // Params :
+    //      line : the line the check format
+    // ------------------------------------------------------------------------------------------
+    private void parse_log(String[] line){
+        final int INCOMING_START = 8
+
+        // The old logs only specify "incoming search params:"
+        // New log format is "incoming <collection/granule> <search/GET> <request/params>"
+        // -------------------------------------------------------------------------------
+        if (line[INCOMING_START + 1] != "search"){
+            parse_new_log_line(line)
+        }
+        else{
+            parse_old_log_line(line)
+        }
+    }
+
+
+
+    // -------------------------------------------------
+    // Description :
+    //      Parses the new log format that contains Json
+    // Params :
+    //      line : the log line to parse
+    // -------------------------------------------------
+    private void parse_new_log_line(String[] line){
+        final int SEARCH_START = 12
+
+        Date date             = get_date_from_line(line)    // date and time of the log
+        String type           = get_type_from_line(line)    //
+        String tQuery         = ""                          // temporary string for the query
+        List<String> tFilters = ["N/A"]                     // temporary variable to hold filters
+        Boolean tFacet        = false                       // temporary variable for the facet
+        def tPage                                           // temporary variable for the page/offset
+
+
+        String workingLine = line.drop(SEARCH_START).join(" ")
+        def slurper = new JsonSlurper()
+        def log = slurper.parseText(workingLine)
+
+        if (log.containsKey("id")){
+            RequestLog tmp = new RequestLog(date, type, log.id)
+            //println("${tmp.get_date()}\t${tmp.get_type()}\t${tmp.get_id()}")
+            this.requestLogs.add(tmp)
+            return
+        }
+
+        if (log.containsKey("queries")) {
+            tQuery = log.queries.value
+        }
+
+        if (log.containsKey("filters")){
+            tFilters = log.filters
+        }
+
+        if (log.containsKey("facets")){
+            tFacet = log.facets
+        }
+
+        if (log.containsKey("page")){
+            tPage = new Tuple2<Integer, Integer>(log.page.max, log.page.offset)
+        }
+
+        SearchLog tmp = new SearchLog(date, type, tQuery, tFilters, tFacet, tPage)
+        //println("${tmp.get_date()}\t${tmp.get_type()}\t${tmp.get_search_query()}\t${tmp.get_filters()}\t${tmp.get_facet()}\t${tmp.get_page()}")
+        this.searchLogs.add(tmp)
     }
 
 
@@ -215,30 +291,24 @@ class LogParser {
     // Params :
     //      line : the log line in which to parse for its data members
     // ------------------------------------------------------------------------------------------------
-    private void parse_line(String[] line) {
-        int i                 = 8       // variable for tracking location in the log string starting at queries:[
-        int j                 = i+1     // variable for traversing the log string
-        int currLevel         = 1       // variable to keep track of what level of brackets the function is in currently
-        int len               = 0       // length of workingLine
-        String tQuery                   // temporary string for the query
-        List<String> tFilters = ["N/A"] // temporary variable to hold filters
-        Boolean tFacet        = false   // temporary variable for the facet
-        def tPage                       // temporary variable for the page/offset
-
-
-        // After each field has been found, these are the index increments to reach the following field
-        // These are a fixed distance from each field
-        // --------------------------------------------------------------------------------------------
+    private void parse_old_log_line(String[] line) {
         final int SEARCH_START  = 11    // The index of the start of the 'incoming search params' section of the log
         final int FILTERS_START = 10    // The index increment needed to get to the start of the filters section of the log
         final int FACETS_START  = 9     // The index increment needed to get to the start of the facets section of the log
         final int FACETS_ESCAPE = 16    // The index increment needed to reach the start of the page:<max> section
 
+        int i                 = 8                           // variable for tracking location in the log string starting at queries:[
+        int j                 = i+1                         // variable for traversing the log string
+        int currLevel         = 1                           // variable to keep track of what level of brackets the function is in currently
+        int len               = 0                           // length of workingLine
+        Date date             = get_date_from_line(line)    // date and time of the log
+        String type           = "incoming search params"    // all types are the same
+        String tQuery         = ""                          // temporary string for the query
+        List<String> tFilters = ["N/A"]                     // temporary variable to hold filters
+        Boolean tFacet        = false                       // temporary variable for the facet
+        def tPage                                           // temporary variable for the page/offset
 
-        // Drop everything before 'incoming search params' as well as the outer brackets, and change to a string
-        // MAY NEED TO CHANGE THIS AND extract_lines() IF THE LOG FORMAT CHANGES
-        // -----------------------------------------------------------------------------------------------------
-        println(line)
+
         String workingLine = line.drop(SEARCH_START).join(" ")
         workingLine = workingLine[1..-2]
         len = workingLine.size()
@@ -289,8 +359,32 @@ class LogParser {
             tPage = get_page_from_line(workingLine, k, k+1)
             tFilters = ["N/A"]
         }
-        SearchLog tmp = new SearchLog(tQuery, tFilters, tFacet, tPage)
-        this.searchLogs.add(tmp)
+        SearchLog tmp = new SearchLog(date, type, tQuery, tFilters, tFacet, tPage)
+        //println("${tmp.get_date()}\t${tmp.get_type()}\t${tmp.get_search_query()}\t${tmp.get_filters()}\t${tmp.get_facet()}\t${tmp.get_page()}")
+        this.oldSearchLogs.add(tmp)
+    }
+
+
+
+    //
+    // Description :
+    //
+    // Params :
+    //
+    // Returns :
+    //
+    private Date get_date_from_line(String[] line){
+        String date = line[0..1].join(" ")
+        Date dateTime = new Date().parse("yyyy-M-d H:m:s.ms", date)
+        return dateTime
+    }
+
+
+
+
+    private String get_type_from_line(String[] line){
+        final int TYPE_START = 9
+        return line[TYPE_START..TYPE_START+1].join(" ")
     }
 
 
