@@ -1,54 +1,46 @@
-import sun.rmi.runtime.Log
-import com.sun.org.apache.xpath.internal.operations.Bool
-import com.sun.xml.internal.bind.v2.runtime.reflect.opt.Const
-
-import java.io.File
-import java.io.FileWriter
-
+// -----------------------------------------------------
+// This class is used to output log maps in a CSV format
+// -----------------------------------------------------
 class LogCSVWriter {
-    private String headerName                   // The name of the header for the map (i.e., "queries", "filters", "facets", "page")
-    private Map<String, Integer> outputMap      // The map in which to output to a CSV file
-    private outputPath                          // The file path for which to output
 
-    LogCSVWriter(){
-        this.headerName = ""
-        this.outputMap = [:]
-        this.outputPath = ""
-    }
-
-    LogCSVWriter(String name, Map<String, Integer> map, String path){
-        set_headerName(name)
+    LogCSVWriter(String name = "", Map<String, Integer> map = [:], String path = ""){
+        set_header_name(name)
         set_map(map)
-        set_path(path)
+        set_output_path(path)
         output_map_to_file()
     }
 
 
     // Getters/Setters
     // ---------------
-    String get_headerName(){
+    String get_header_name(){
         return this.headerName
     }
+
 
     Map<String, Integer> get_map(){
         return this.outputMap
     }
 
-    String get_path(){
+
+    String get_output_path(){
         return this.outputPath
     }
 
-    void set_headerName(String name){
+
+    void set_header_name(String name){
         this.headerName = name
     }
+
+
     void set_map(Map<String, Integer> map){
         this.outputMap = map
     }
 
-    void set_path(String path){
+
+    void set_output_path(String path){
         this.outputPath = path
     }
-
 
 
     // ---------------------------------------------------------------------------------
@@ -69,6 +61,17 @@ class LogCSVWriter {
         }
     }
 
+
+
+    // --------------------------------
+    // PRIVATE DATA MEMBERS AND METHODS
+    // --------------------------------
+
+    private String headerName                   // The name of the header for the map (i.e., "queries", "filters", "facets", "page")
+    private Map<String, Integer> outputMap      // The map in which to output to a CSV file
+    private outputPath                          // The file path for which to output
+
+
     // -------------------------------------------------------------------------------------------------
     // Description :
     //      A helper function to make text .csv compatible by replacing single quotes with double quotes
@@ -76,6 +79,8 @@ class LogCSVWriter {
     //      key : the string in which to make csv compatible
     // -------------------------------------------------------------------------------------------------
     private String make_csv_compatible(String key) {
-        return (key.replaceAll('"', '""'))
+        String singleQuote = '"'
+        String doubleQuote = '""'
+        return (key.replaceAll(singleQuote, doubleQuote))
     }
 }

@@ -1,10 +1,7 @@
+// -----------------------------------------------
+// This class holds all of the current search logs
+// -----------------------------------------------
 class LogHandler {
-    private List<SearchLog> oldLogs
-    private List<SearchLog> searchLogs
-    private List<RequestLog> requestLogs
-    private int oldLogCount
-    private int searchLogCount
-    private int requestLogCount
 
     LogHandler(List<SearchLog> pOldLogs = [], List<SearchLog> pSearchLogs = [], List<RequestLog> pRequestLogs = []){
         this.oldLogs         = pOldLogs
@@ -15,26 +12,32 @@ class LogHandler {
         this.requestLogCount = pRequestLogs.size()
     }
 
-    void print_data(){
-        this.oldLogs.each { SearchLog tmp ->
-            println("${tmp.get_date()}\t${tmp.get_type()}\t${tmp.get_search_query()}\t${tmp.get_filters()}\t${tmp.get_facet()}\t${tmp.get_page()}")
+    // Getters/Setters
+    // ---------------
 
-        }
-        println("Size: ${this.oldLogCount}")
-        this.searchLogs.each { SearchLog tmp ->
-            println("${tmp.get_date()}\t${tmp.get_type()}\t${tmp.get_search_query()}\t${tmp.get_filters()}\t${tmp.get_facet()}\t${tmp.get_page()}")
-
-        }
-        println("Size: ${this.searchLogCount}")
-
-        this.requestLogs.each { RequestLog tmp ->
-            println("${tmp.get_date()}\t${tmp.get_type()}\t${tmp.get_id()}")
-        }
-        println("Size: ${this.requestLogCount}")
-
+    void get_logs_from_parser(LogParser parser){
+        this.oldLogs = parser.pass_old_search_logs()
+        this.searchLogs = parser.pass_search_logs()
+        this.requestLogs = parser.pass_request_logs()
+        this.oldLogCount = this.oldLogs.size()
+        this.searchLogCount = this.searchLogs.size()
+        this.requestLogCount = this.requestLogs.size()
     }
 
 
+    List<SearchLog> get_old_logs(){
+        return this.oldLogs
+    }
+
+
+    List<SearchLog> get_search_logs(){
+        return this.searchLogs
+    }
+
+
+    List<RequestLog> get_request_logs(){
+        return this.requestLogs
+    }
 
 
     void add_old_search_log(SearchLog log){
@@ -42,13 +45,28 @@ class LogHandler {
         this.oldLogCount++
     }
 
+
     void add_search_log(SearchLog log){
         this.searchLogs.add(log)
         this.searchLogCount++
     }
 
+
     void add_request_log(RequestLog log){
         this.requestLogs.add(log)
         this.requestLogCount++
     }
+
+
+
+    // ------------------------
+    // PRIVATE DATA AND METHODS
+    // ------------------------
+
+    private List<SearchLog> oldLogs
+    private List<SearchLog> searchLogs
+    private List<RequestLog> requestLogs
+    private int oldLogCount
+    private int searchLogCount
+    private int requestLogCount
 }

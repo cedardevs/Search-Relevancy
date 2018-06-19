@@ -1,3 +1,6 @@
+// -----------------------------------------------------------
+// A type of search log used when a user requests a collection
+// -----------------------------------------------------------
 class RequestLog {
     private Date dateTime
     private String type
@@ -9,13 +12,16 @@ class RequestLog {
         this.id = pId
     }
 
+
     Date get_date(){
         return this.dateTime
     }
 
+
     String get_type(){
         return this.type
     }
+
 
     String get_id(){
         return this.id
