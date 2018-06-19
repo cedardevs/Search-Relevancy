@@ -13,13 +13,13 @@ class LogParser {
     //      paths : a file path or paths to the logs that are to be parsed.
     // ---------------------------------------------------------------------------------------------------------------------------
     LogParser(List<String> paths = "") {
-        initialize_data_members()
+        initializeDataMembers()
 
         paths.each {String filePath ->
-            add_log_path(filePath)
+            addLogPath(filePath)
         }
 
-        read_logs()
+        readLogs()
     }
 
 
@@ -29,7 +29,7 @@ class LogParser {
     // Params :
     //      filePath : the path to the log in which to be added
     // ----------------------------------------------------------
-    void add_log_path(String filePath) {
+    void addLogPath(String filePath) {
         File iFile = new File(filePath)
 
         if ( !(iFile.exists()) ) {
@@ -45,15 +45,15 @@ class LogParser {
     // Description :
     //      Reads all the currently queued logs from logPaths
     // ------------------------------------------------------
-    void read_logs() {
+    void readLogs() {
         logPaths.each { String path ->
             File file = new File(path)
 
             file.eachLine('utf-8') {String line ->
-                def logLine = is_search_log(line)
+                def logLine = isSearchLog(line)
 
                 if (logLine){
-                    parse_log(logLine)
+                    parseLog(logLine)
                 }
             }
         }
@@ -65,21 +65,21 @@ class LogParser {
     // pass_logs functions are used to pass logs over to the LogHandler
     // THESE REMOVE ALL CURRENT LOGS FROM THEIR LISTS WHEN CALLED
     // ----------------------------------------------------------------
-    List<SearchLog> pass_old_search_logs(){
+    List<SearchLog> passOldSearchLogs(){
         List<SearchLog> tmp = this.oldSearchLogs
         this.oldSearchLogs = []
         return tmp
     }
 
 
-    List<SearchLog> pass_search_logs(){
+    List<SearchLog> passSearchLogs(){
         List<SearchLog> tmp = this.searchLogs
         this.searchLogs = []
         return tmp
     }
 
 
-    List<RequestLog> pass_request_logs(){
+    List<RequestLog> passRequestLogs(){
         List<RequestLog> tmp = this.requestLogs
         this.requestLogs = []
         return tmp
@@ -101,7 +101,7 @@ class LogParser {
     // Description :
     //      Initializes the data members for constructors
     // --------------------------------------------------
-    private void initialize_data_members(){
+    private void initializeDataMembers(){
         this.logPaths         = []
         this.searchLogs       = []
         this.oldSearchLogs    = []
@@ -117,7 +117,7 @@ class LogParser {
     // Returns :
     //      returns the split line if the line is relevant and false otherwise
     // -----------------------------------------------------------------------
-    private def is_search_log(String line){
+    private def isSearchLog(String line){
         final int PARAM_START = 11        // The index of 'incoming' of the log after the line has been split
 
         String[] words = line.split()
@@ -137,17 +137,17 @@ class LogParser {
     // Params :
     //      line : the line the check format
     // ------------------------------------------------------------------------------------------
-    private void parse_log(String[] line){
+    private void parseLog(String[] line){
         final int INCOMING_START = 8
 
         // The old logs only specify "incoming search params:"
         // New log format is "<Method> <collection/granule> <search/ID> <param/params>"
         // -------------------------------------------------------------------------------
         if (line[INCOMING_START] != "incoming"){
-            parse_new_log_line(line)
+            parseNewLogLine(line)
         }
         else{
-            parse_old_log_line(line)
+            parseOldLogLine(line)
         }
     }
 
@@ -158,11 +158,11 @@ class LogParser {
     // Params :
     //      line : the log line to parse
     // -------------------------------------------------
-    private void parse_new_log_line(String[] line){
+    private void parseNewLogLine(String[] line){
         final int SEARCH_START = 12
 
-        Date date             = get_date_from_line(line)            // date and time of the log
-        String type           = get_type_from_line(line)            // specifies what kind of search
+        Date date             = getDateFromLine(line)            // date and time of the log
+        String type           = getTypeFromLine(line)            // specifies what kind of search
         String tQuery         = ""                                  // temporary string for the query
         List<String> tFilters = []                                  // temporary variable to hold filters
         Boolean tFacet        = false                               // temporary variable for the facet
@@ -198,8 +198,8 @@ class LogParser {
             tPage = new Tuple2<Integer, Integer>(log.page.max, log.page.offset)
         }
 
-        SearchLog tmp = new SearchLog(date, type, tQuery, tFilters, tFacet, tPage)
-        this.searchLogs.add(tmp)
+        SearchLog searchLog = new SearchLog(date, type, tQuery, tFilters, tFacet, tPage)
+        this.searchLogs.add(searchLog)
     }
 
     // ---------------------------------------
@@ -208,7 +208,7 @@ class LogParser {
     // Params :
     //      line : the split log line to parse
     // ---------------------------------------
-    private Date get_date_from_line(String[] line){
+    private Date getDateFromLine(String[] line){
         String date = line[0..1].join(" ")
         Date dateTime = new Date().parse("yyyy-M-d H:m:s.ms", date)
         return dateTime
@@ -220,7 +220,7 @@ class LogParser {
     // Params :
     //      line : the split log line to parse
     // ---------------------------------------
-    private String get_type_from_line(String[] line){
+    private String getTypeFromLine(String[] line){
         final int TYPE_START = 8
         return line[TYPE_START..TYPE_START+2].join(" ")
     }
@@ -232,7 +232,7 @@ class LogParser {
     // Params :
     //      line : the log line in which to parse for its data members
     // ------------------------------------------------------------------------------------------------
-    private void parse_old_log_line(String[] line) {
+    private void parseOldLogLine(String[] line) {
         final int SEARCH_START  = 11    // The index of the start of the 'incoming search params' section of the log
         final int FILTERS_START = 10    // The index increment needed to get to the start of the filters section of the log
         final int FACETS_START  = 9     // The index increment needed to get to the start of the facets section of the log
@@ -242,7 +242,7 @@ class LogParser {
         int j                 = i+1                         // variable for traversing the log string
         int currLevel         = 1                           // variable to keep track of what level of brackets the function is in currently
         int len               = 0                           // length of workingLine
-        Date date             = get_date_from_line(line)    // date and time of the log
+        Date date             = getDateFromLine(line)       // date and time of the log
         String type           = "incoming search params"    // all types are the same
         String tQuery         = ""                          // temporary string for the query
         List<String> tFilters = []                          // temporary variable to hold filters
@@ -254,26 +254,26 @@ class LogParser {
         workingLine = workingLine[1..-2]
         len = workingLine.size()
 
-        j = find_field_end(workingLine, len, i)
-        tQuery = "[${get_query_from_line(workingLine, i, j)}]"
+        j = findFieldEnd(workingLine, len, i)
+        tQuery = "[${getQueryFromLine(workingLine, i, j)}]"
 
         i = j + FILTERS_START
 
         if ( (i+1) < len){
-            j = find_field_end(workingLine, len, i)
-            tFilters = get_filters_from_line(workingLine, i, j)
+            j = findFieldEnd(workingLine, len, i)
+            tFilters = getFiltersFromLine(workingLine, i, j)
         }
 
         i = j + FACETS_START
         j = i + 1
         if (j < len){
-            tFacet = get_facet_from_line(workingLine, i)
-            i += ( FACETS_ESCAPE + bool_to_int(!tFacet) )       // The increment is different for facet = true and facet = false
+            tFacet = getFacetFromLine(workingLine, i)
+            i += ( FACETS_ESCAPE + boolToInt(!tFacet) )       // The increment is different for facet = true and facet = false
         }
 
         j = i + 1
         if (j < len){
-            tPage = get_page_from_line(workingLine, i, j)
+            tPage = getPageFromLine(workingLine, i, j)
 
         }
         else {
@@ -285,7 +285,7 @@ class LogParser {
 
         if (tFilters != [] && tFilters[0][0] == ':'){
             int k = len - tFilters[0].size()
-            tPage = get_page_from_line(workingLine, k, k+1)
+            tPage = getPageFromLine(workingLine, k, k+1)
             tFilters = []
         }
         SearchLog tmp = new SearchLog(date, type, tQuery, tFilters, tFacet, tPage)
@@ -295,14 +295,14 @@ class LogParser {
 
 
     // -------------------------------------------------------------------
-    // The following are helper functions only for use by parse_old_logs()
+    // The following are helper functions only for use by parseOldLogs()
     // -------------------------------------------------------------------
 
 
 
     // --------------------------------------------------------------------------------------------------------------------------------
     // Description :
-    //      A helper function for parse_line() that finds the outer most level of square brackets starting at a given index
+    //      A helper function for parseLine() that finds the outer most level of square brackets starting at a given index
     // Params :
     //      line : the string to parse
     //      len : the length of line
@@ -310,7 +310,7 @@ class LogParser {
     // Return:
     //      returns the index of the character AFTER  the outer most closing (']') bracket
     // --------------------------------------------------------------------------------------------------------------------------------
-    private int find_field_end(String line, int len, int startIndex){
+    private int findFieldEnd(String line, int len, int startIndex){
         int j = startIndex + 1
         int currLevel = 1
 
@@ -335,7 +335,7 @@ class LogParser {
     }
 
 
-    private String get_query_from_line(String workingLine, int startIndex, int endIndex){
+    private String getQueryFromLine(String workingLine, int startIndex, int endIndex){
         final int QUERIES_START = startIndex + 24       // If there is a query, then it's in a fixed position from the starting index
 
         // Allegedly cannot get "" as a query in OneStop 2.0
@@ -349,17 +349,17 @@ class LogParser {
     }
 
 
-    private List<String> get_filters_from_line(String workingLine, int startIndex, int endIndex){
+    private List<String> getFiltersFromLine(String workingLine, int startIndex, int endIndex){
         if ( (endIndex - startIndex) == 2 ){
             return []
         }
         else{
-            return get_filter_fields(workingLine[(startIndex+1)..(endIndex-2)])
+            return getFilterFields(workingLine[(startIndex+1)..(endIndex-2)])
         }
     }
 
 
-    private List<String> get_filter_fields(String filterLine) {
+    private List<String> getFilterFields(String filterLine) {
         int i, j = 1
         int currLevel = 0
         int len = filterLine.size()
@@ -387,7 +387,7 @@ class LogParser {
     }
 
 
-    private Boolean get_facet_from_line(String workingLine, int startIndex){
+    private Boolean getFacetFromLine(String workingLine, int startIndex){
         if (workingLine[startIndex] == 't') {
             return true
         }
@@ -397,12 +397,12 @@ class LogParser {
     }
 
 
-    private int bool_to_int(Boolean b){
+    private int boolToInt(Boolean b){
         return b.compareTo(false)
     }
 
 
-    private Tuple2<Integer, Integer> get_page_from_line(String workingLine, int startIndex, int endIndex){
+    private Tuple2<Integer, Integer> getPageFromLine(String workingLine, int startIndex, int endIndex){
         final int OFFSET_START  = 9     // The start the of page:<offset> section of the log from page:<max> section
         int max, offset
 

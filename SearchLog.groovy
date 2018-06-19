@@ -14,57 +14,57 @@ class SearchLog {
 
     // Getters/Setters
     // -------
-    Date get_date(){
+    Date getDate(){
         return this.dateTime
     }
 
 
-    String get_type(){
+    String getType(){
         return this.type
     }
 
 
-    String get_search_query(){
+    String getSearchQuery(){
         return this.searchQuery
     }
 
 
-    List<String> get_filters(){
+    List<String> getFilters(){
         return this.filters
     }
 
 
-    Boolean get_facet(){
+    Boolean getFacet(){
         return this.facets
     }
 
 
-    Tuple2<Integer, Integer> get_page(){
+    Tuple2<Integer, Integer> getPage(){
         return this.page
     }
 
 
-    void set_date(String pDateTime){
+    void setDate(String pDateTime){
         this.dateTime = new Date().parse("yyyy-M-d H:m:s.ms", pDateTime)
     }
 
 
-    void set_search_query(String pQuery){
+    void setSearchQuery(String pQuery){
         this.searchQuery = pQuery
     }
 
 
-    void set_filters(List<String> pFilters){
+    void setFilters(List<String> pFilters){
         this.filters = pFilters
     }
 
 
-    void set_facet(Boolean pFacets){
+    void setFacet(Boolean pFacets){
         this.facets = pFacets
     }
 
 
-    void set_page(Tuple2<Integer, Integer> pPage){
+    void setPage(Tuple2<Integer, Integer> pPage){
         this.page = pPage
     }
 

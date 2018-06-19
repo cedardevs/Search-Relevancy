@@ -7,54 +7,45 @@ class LogHandler {
         this.oldLogs         = pOldLogs
         this.searchLogs      = pSearchLogs
         this.requestLogs     = pRequestLogs
-        this.oldLogCount     = pOldLogs.size()
-        this.searchLogCount  = pSearchLogs.size()
-        this.requestLogCount = pRequestLogs.size()
     }
 
     // Getters/Setters
     // ---------------
 
-    void get_logs_from_parser(LogParser parser){
-        this.oldLogs = parser.pass_old_search_logs()
-        this.searchLogs = parser.pass_search_logs()
-        this.requestLogs = parser.pass_request_logs()
-        this.oldLogCount = this.oldLogs.size()
-        this.searchLogCount = this.searchLogs.size()
-        this.requestLogCount = this.requestLogs.size()
+    void getLogsFromParser(LogParser parser){
+        this.oldLogs = parser.passOldSearchLogs()
+        this.searchLogs = parser.passSearchLogs()
+        this.requestLogs = parser.passRequestLogs()
     }
 
 
-    List<SearchLog> get_old_logs(){
+    List<SearchLog> getOldLogs(){
         return this.oldLogs
     }
 
 
-    List<SearchLog> get_search_logs(){
+    List<SearchLog> getSearchLogs(){
         return this.searchLogs
     }
 
 
-    List<RequestLog> get_request_logs(){
+    List<RequestLog> getRequestLogs(){
         return this.requestLogs
     }
 
 
-    void add_old_search_log(SearchLog log){
+    void addOldSearchLog(SearchLog log){
         this.oldLogs.add(log)
-        this.oldLogCount++
     }
 
 
-    void add_search_log(SearchLog log){
+    void addSearchLog(SearchLog log){
         this.searchLogs.add(log)
-        this.searchLogCount++
     }
 
 
-    void add_request_log(RequestLog log){
+    void addRequestLog(RequestLog log){
         this.requestLogs.add(log)
-        this.requestLogCount++
     }
 
 
@@ -66,7 +57,4 @@ class LogHandler {
     private List<SearchLog> oldLogs
     private List<SearchLog> searchLogs
     private List<RequestLog> requestLogs
-    private int oldLogCount
-    private int searchLogCount
-    private int requestLogCount
 }

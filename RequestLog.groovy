@@ -8,22 +8,22 @@ class RequestLog {
 
     RequestLog(Date pDateTime = new Date(), String pType = "", String pId = ""){
         this.dateTime = pDateTime
-        this.type = pType
-        this.id = pId
+        this.type     = pType
+        this.id       = pId
     }
 
 
-    Date get_date(){
+    Date getDate(){
         return this.dateTime
     }
 
 
-    String get_type(){
+    String getType(){
         return this.type
     }
 
 
-    String get_id(){
+    String getId(){
         return this.id
     }
 }
