@@ -1,3 +1,5 @@
+import RequestLog
+import SearchLog
 import groovy.json.JsonSlurper
 
 // -----------------------------------------------------
@@ -78,7 +80,7 @@ class LogParser {
     // Description :
     //      Initializes the data members for constructors
     // --------------------------------------------------
-    private void initializeDataMembers(){
+    void initializeDataMembers(){
         this.logPaths         = []
         this.searchLogs       = []
         this.oldSearchLogs    = []
